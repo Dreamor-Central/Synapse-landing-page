@@ -5,52 +5,33 @@ export interface OperationalDomain {
   color: string;
   description: string;
   systems: string[];
-  metrics: { label: string; value: string; trend: 'up' | 'down' | 'nominal'; status: 'good' | 'warning' | 'alert' }[];
   connections: string[]; // Connected domain IDs
-  throughput: string;
-  latency: string;
 }
 
-export interface ProblemIsland {
-  id: string;
-  name: string;
-  toolset: string;
-  isolatedView: string;
-  dataLatency: string;
-  blindspot: string;
-  impactOnSurge: string;
-  status: 'normal' | 'stressed' | 'critical';
-}
+export type CapabilityState = 'understand' | 'anticipate' | 'orchestrate';
 
-export interface HowItWorksStage {
+export interface CoreCapability {
+  id: CapabilityState;
   step: string;
   title: string;
   headline: string;
   description: string;
-  details: string[];
-  metricsPreview: { label: string; value: string }[];
-  systemCapability: string;
+  visualFocus: string;
+  visualStateDescription: string;
+  points: string[];
 }
 
-export interface BusinessSignal {
+export interface ScenarioSignal {
   id: string;
   department: string;
-  name: string;
-  metric: string;
-  delta: string;
-  direction: 'up' | 'down';
-  severity: 'warning' | 'critical' | 'alert';
-  causalLink: string;
+  observation: string;
+  detail: string;
+  color: string;
 }
 
-export interface Capability {
-  id: string;
+export interface ScenarioIntervention {
   title: string;
-  eyebrow: string;
-  tagline: string;
+  department: string;
   description: string;
-  technicalArchitecture: string[];
-  operationalOutcome: string;
-  telemetryMetric: { label: string; value: string };
+  impact: string;
 }
-

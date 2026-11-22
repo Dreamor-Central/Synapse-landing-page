@@ -1,22 +1,24 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OPERATIONAL_DOMAINS } from '../data/enterpriseData';
-import type { OperationalDomain } from '../types';
-import type { NarrativeStage } from '../hooks/useScrollNarrative';
+
+export type VisualizationMode = 'hero' | 'understand' | 'anticipate' | 'orchestrate' | 'scenario';
 
 interface ContinuousEnterprise3DProps {
-  currentStage: NarrativeStage;
-  activeDomainId?: string;
-  onSelectDomain?: (domain: OperationalDomain) => void;
+  mode?: VisualizationMode;
+  interactive?: boolean;
   className?: string;
 }
 
 interface DomainNode3D {
-  domain: OperationalDomain;
-  basePosition: THREE.Vector3;
-  currentPosition: THREE.Vector3;
-  targetPosition: THREE.Vector3;
-  mesh: THREE.Mesh;
+  id: string;
+  name: string;
+  color: number;
+  basePos: THREE.Vector3;
+  currentPos: THREE.Vector3;
+  targetPos: THREE.Vector3;
+  group: THREE.Group;
+  coreMesh: THREE.Mesh;
   shellMesh: THREE.Mesh;
   ringMesh: THREE.Mesh;
   curveToCore: THREE.CatmullRomCurve3;
@@ -26,31 +28,19 @@ interface DomainNode3D {
 }
 
 export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
-  currentStage,
-  activeDomainId,
-  onSelectDomain,
+  mode = 'hero',
+  interactive = true,
   className = ''
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedDomain, setSelectedDomain] = useState<OperationalDomain>(OPERATIONAL_DOMAINS[0]);
-  const [hoveredDomainId, setHoveredDomainId] = useState<string | null>(null);
   const [webGLSupported, setWebGLSupported] = useState<boolean>(true);
 
-  // Sync prop changes
+  // Keep a ref to mode so animation loop always reads latest without re-creating scene
+  const modeRef = useRef<VisualizationMode>(mode);
   useEffect(() => {
-    if (activeDomainId) {
-      const match = OPERATIONAL_DOMAINS.find(d => d.id === activeDomainId);
-      if (match) setSelectedDomain(match);
-    }
-  }, [activeDomainId]);
-
-  const handleDomainClick = useCallback((domain: OperationalDomain) => {
-    setSelectedDomain(domain);
-    if (onSelectDomain) {
-      onSelectDomain(domain);
-    }
-  }, [onSelectDomain]);
+    modeRef.current = mode;
+  }, [mode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -68,7 +58,7 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
       renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.2;
+      renderer.toneMappingExposure = 1.25;
     } catch {
       setWebGLSupported(false);
       return;
@@ -78,27 +68,26 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
 
     // 1. SCENE & CAMERA
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x07080b, 0.032);
+    scene.fog = new THREE.FogExp2(0x07080b, 0.028);
 
-    const isMobileHero = container.clientWidth < 640;
-    const heroFov = isMobileHero ? 54 : 42;
+    const isMobile = container.clientWidth < 640;
     const camera = new THREE.PerspectiveCamera(
-      heroFov,
+      isMobile ? 54 : 44,
       container.clientWidth / container.clientHeight,
       0.1,
-      100
+      120
     );
-    camera.position.set(0, 1.8, isMobileHero ? 14.0 : 12.0);
+    camera.position.set(0, 1.6, isMobile ? 14.5 : 12.2);
 
-    // 2. LIGHTING RIG
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // 2. LIGHTING
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
     scene.add(ambientLight);
 
-    const corePointLight = new THREE.PointLight(0x38bdf8, 3.5, 30);
-    corePointLight.position.set(0, 0, 0);
-    scene.add(corePointLight);
+    const coreLight = new THREE.PointLight(0x38bdf8, 3.8, 32);
+    coreLight.position.set(0, 0, 0);
+    scene.add(coreLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
     keyLight.position.set(6, 10, 8);
     scene.add(keyLight);
 
@@ -110,93 +99,106 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
-    // Inner glowing nucleus
-    const innerNucleusGeo = new THREE.SphereGeometry(0.8, 32, 32);
-    const innerNucleusMat = new THREE.MeshBasicMaterial({
+    // Glowing inner nucleus
+    const nucleusGeo = new THREE.SphereGeometry(0.85, 32, 32);
+    const nucleusMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
       opacity: 0.95
     });
-    const innerNucleus = new THREE.Mesh(innerNucleusGeo, innerNucleusMat);
-    coreGroup.add(innerNucleus);
+    const nucleusMesh = new THREE.Mesh(nucleusGeo, nucleusMat);
+    coreGroup.add(nucleusMesh);
 
     // Mid faceted icosahedron
-    const midFacetedGeo = new THREE.IcosahedronGeometry(1.35, 1);
-    const midFacetedMat = new THREE.MeshStandardMaterial({
-      color: 0x0ea5e9,
+    const facetedGeo = new THREE.IcosahedronGeometry(1.35, 1);
+    const facetedMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
       wireframe: true,
       emissive: 0x0369a1,
-      emissiveIntensity: 0.85,
+      emissiveIntensity: 0.9,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.85,
       roughness: 0.2
     });
-    const midFacetedMesh = new THREE.Mesh(midFacetedGeo, midFacetedMat);
-    coreGroup.add(midFacetedMesh);
+    const facetedMesh = new THREE.Mesh(facetedGeo, facetedMat);
+    coreGroup.add(facetedMesh);
 
-    // Outer crystalline cage
-    const outerCageGeo = new THREE.DodecahedronGeometry(1.8, 0);
+    // Outer crystalline geodesic cage
+    const outerCageGeo = new THREE.DodecahedronGeometry(1.9, 0);
     const outerCageMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
       wireframe: true,
       transparent: true,
-      opacity: 0.3
+      opacity: 0.32
     });
     const outerCageMesh = new THREE.Mesh(outerCageGeo, outerCageMat);
     coreGroup.add(outerCageMesh);
 
-    // Gyroscopic equatorial rings
-    const ringGeo = new THREE.RingGeometry(2.1, 2.16, 64);
+    // Gyroscopic rings
+    const ringGeo = new THREE.RingGeometry(2.2, 2.25, 64);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.5
+      opacity: 0.55
     });
-    const gyroRing1 = new THREE.Mesh(ringGeo, ringMat);
-    gyroRing1.rotation.x = Math.PI / 2;
-    coreGroup.add(gyroRing1);
+    const ring1 = new THREE.Mesh(ringGeo, ringMat);
+    ring1.rotation.x = Math.PI / 2;
+    coreGroup.add(ring1);
 
-    const gyroRing2 = new THREE.Mesh(ringGeo, ringMat);
-    gyroRing2.rotation.x = Math.PI / 3;
-    gyroRing2.rotation.y = Math.PI / 6;
-    coreGroup.add(gyroRing2);
+    const ring2 = new THREE.Mesh(ringGeo, ringMat);
+    ring2.rotation.x = Math.PI / 3;
+    ring2.rotation.y = Math.PI / 6;
+    coreGroup.add(ring2);
 
-    // 4. SURROUNDING OPERATIONAL DOMAIN NODES (WELL-SPACED 3D CONSTELLATION)
-    const baseDomainPositions = [
-      new THREE.Vector3(3.8, 1.4, 0.4),    // Finance
-      new THREE.Vector3(-3.4, 2.2, -0.8),  // People
-      new THREE.Vector3(2.8, -2.2, 1.2),   // Customers
-      new THREE.Vector3(-3.0, -2.0, 1.6),  // Operations
-      new THREE.Vector3(4.0, -0.8, -1.4),  // Sales
-      new THREE.Vector3(-1.8, 2.8, 1.4),   // Marketing
-      new THREE.Vector3(-4.0, -0.4, -1.8), // Supply Chain
-      new THREE.Vector3(1.0, 3.4, -1.0)    // Strategy
+    // 4. COORDINATED SHOCKWAVE RING (Active in orchestrate mode)
+    const shockwaveGeo = new THREE.RingGeometry(0.8, 0.88, 64);
+    const shockwaveMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.0
+    });
+    const shockwaveMesh = new THREE.Mesh(shockwaveGeo, shockwaveMat);
+    shockwaveMesh.rotation.x = Math.PI / 2;
+    scene.add(shockwaveMesh);
+
+    // 5. 8 SURROUNDING OPERATIONAL DOMAIN NODES
+    const baseDomainPositions: [number, number, number][] = [
+      [3.8, 1.4, 0.4],    // Sales
+      [-3.4, -1.8, 1.4],  // Operations
+      [2.6, -2.4, 1.2],   // Customers
+      [3.6, -1.0, -1.6],  // Finance
+      [-1.8, 2.8, 1.2],   // Marketing
+      [-3.8, 0.4, -1.6],  // Supply Chain
+      [1.4, 3.4, -0.8],   // People
+      [-3.2, 2.0, -1.0]   // Strategy
     ];
 
     const domainNodes: DomainNode3D[] = [];
-    const interactiveMeshes: THREE.Mesh[] = [];
 
     OPERATIONAL_DOMAINS.forEach((domain, idx) => {
-      const pos = baseDomainPositions[idx].clone();
+      const coords = baseDomainPositions[idx] || [3, 0, 0];
+      const basePos = new THREE.Vector3(...coords);
       const colorHex = parseInt(domain.color.replace('#', '0x'), 16);
 
+      const group = new THREE.Group();
+      group.position.copy(basePos);
+      scene.add(group);
+
       // Node Diamond Core
-      const nodeGeo = new THREE.OctahedronGeometry(0.42, 0);
-      const nodeMat = new THREE.MeshStandardMaterial({
+      const coreGeo = new THREE.OctahedronGeometry(0.38, 0);
+      const coreMat = new THREE.MeshStandardMaterial({
         color: colorHex,
         emissive: colorHex,
         emissiveIntensity: 0.85,
         roughness: 0.25
       });
-      const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
-      nodeMesh.position.copy(pos);
-      nodeMesh.userData = { domainId: domain.id };
-      scene.add(nodeMesh);
-      interactiveMeshes.push(nodeMesh);
+      const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      group.add(coreMesh);
 
       // Node Outer Wireframe Shell
-      const shellGeo = new THREE.IcosahedronGeometry(0.62, 1);
+      const shellGeo = new THREE.IcosahedronGeometry(0.58, 1);
       const shellMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         wireframe: true,
@@ -204,47 +206,45 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
         opacity: 0.35
       });
       const shellMesh = new THREE.Mesh(shellGeo, shellMat);
-      shellMesh.position.copy(pos);
-      scene.add(shellMesh);
+      group.add(shellMesh);
 
       // Node Orbiting Equatorial Ring
-      const nodeRingGeo = new THREE.TorusGeometry(0.78, 0.015, 12, 48);
+      const nodeRingGeo = new THREE.TorusGeometry(0.72, 0.015, 12, 48);
       const nodeRingMat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        transparent: true,
-        opacity: 0.5
-      });
-      const ringMesh = new THREE.Mesh(nodeRingGeo, nodeRingMat);
-      ringMesh.position.copy(pos);
-      ringMesh.rotation.x = Math.PI / 2;
-      scene.add(ringMesh);
-
-      // 3D Spline to Central Core
-      const midPoint = pos.clone().multiplyScalar(0.5);
-      midPoint.y += (Math.random() - 0.5) * 1.2;
-      const curveToCore = new THREE.CatmullRomCurve3([
-        pos,
-        midPoint,
-        new THREE.Vector3(0, 0, 0)
-      ]);
-
-      const points = curveToCore.getPoints(36);
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-      const lineMat = new THREE.LineBasicMaterial({
         color: colorHex,
         transparent: true,
         opacity: 0.45
       });
+      const ringMesh = new THREE.Mesh(nodeRingGeo, nodeRingMat);
+      ringMesh.rotation.x = Math.PI / 2;
+      group.add(ringMesh);
+
+      // 3D Spline to Central Core
+      const midPoint = basePos.clone().multiplyScalar(0.5);
+      midPoint.y += (Math.random() - 0.5) * 1.0;
+      const curveToCore = new THREE.CatmullRomCurve3([
+        basePos,
+        midPoint,
+        new THREE.Vector3(0, 0, 0)
+      ]);
+
+      const points = curveToCore.getPoints(32);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: 0.38
+      });
       const lineMesh = new THREE.Line(lineGeo, lineMat);
       scene.add(lineMesh);
 
-      // Flowing photon packets
+      // Flowing photon data packets
       const packetCount = 3;
-      const packetProgress = [0.1, 0.45, 0.8];
+      const packetProgress = [0.12, 0.46, 0.8];
       const packetMeshes: THREE.Mesh[] = [];
 
       for (let p = 0; p < packetCount; p++) {
-        const pGeo = new THREE.SphereGeometry(0.065, 12, 12);
+        const pGeo = new THREE.SphereGeometry(0.06, 10, 10);
         const pMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const pMesh = new THREE.Mesh(pGeo, pMat);
         scene.add(pMesh);
@@ -252,11 +252,14 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
       }
 
       domainNodes.push({
-        domain,
-        basePosition: pos,
-        currentPosition: pos.clone(),
-        targetPosition: pos.clone(),
-        mesh: nodeMesh,
+        id: domain.id,
+        name: domain.name,
+        color: colorHex,
+        basePos,
+        currentPos: basePos.clone(),
+        targetPos: basePos.clone(),
+        group,
+        coreMesh,
         shellMesh,
         ringMesh,
         curveToCore,
@@ -266,66 +269,97 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
       });
     });
 
-    // MOUSE PARALLAX & RAYCASTING
-    let mouseX = 0;
-    let mouseY = 0;
-    let targetX = 0;
-    let targetY = 0;
+    // 6. LATERAL NEURAL FILAMENTS (Cross-Domain Web)
+    const filamentPairs: [string, string][] = [
+      ['sales', 'operations'],
+      ['operations', 'customers'],
+      ['customers', 'finance'],
+      ['finance', 'sales'],
+      ['marketing', 'sales'],
+      ['supply-chain', 'operations'],
+      ['people', 'operations'],
+      ['strategy', 'finance']
+    ];
 
-    const raycaster = new THREE.Raycaster();
-    const mouseVec = new THREE.Vector2();
+    const filaments: { line: THREE.Line; idA: string; idB: string }[] = [];
+    filamentPairs.forEach(([idA, idB]) => {
+      const nodeA = domainNodes.find(n => n.id === idA);
+      const nodeB = domainNodes.find(n => n.id === idB);
+      if (!nodeA || !nodeB) return;
+
+      const mid = nodeA.basePos.clone().lerp(nodeB.basePos, 0.5);
+      mid.multiplyScalar(1.18);
+
+      const curve = new THREE.CatmullRomCurve3([
+        nodeA.basePos,
+        mid,
+        nodeB.basePos
+      ]);
+
+      const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(24));
+      const mat = new THREE.LineBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending
+      });
+      const line = new THREE.Line(geo, mat);
+      scene.add(line);
+      filaments.push({ line, idA, idB });
+    });
+
+    // 7. AMBIENT PARTICLES
+    const particleCount = 280;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePos = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      const r = 5 + Math.random() * 16;
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(2 * Math.random() - 1);
+      particlePos[i3] = r * Math.sin(ph) * Math.cos(th);
+      particlePos[i3 + 1] = r * Math.sin(ph) * Math.sin(th) * 0.7;
+      particlePos[i3 + 2] = r * Math.cos(ph);
+    }
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+    const particleMat = new THREE.PointsMaterial({
+      color: 0x38bdf8,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending
+    });
+    const particleCloud = new THREE.Points(particleGeo, particleMat);
+    scene.add(particleCloud);
+
+    // MOUSE / TOUCH PARALLAX
+    let targetMouseX = 0;
+    let targetMouseY = 0;
+    let curMouseX = 0;
+    let curMouseY = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (!interactive) return;
       const rect = container.getBoundingClientRect();
-      targetX = ((e.clientX - rect.left) / rect.width - 0.5) * 1.5;
-      targetY = ((e.clientY - rect.top) / rect.height - 0.5) * 1.0;
-
-      mouseVec.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseVec.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(mouseVec, camera);
-
-      const intersects = raycaster.intersectObjects(interactiveMeshes);
-      if (intersects.length > 0) {
-        const domainId = intersects[0].object.userData.domainId;
-        setHoveredDomainId(domainId);
-        container.style.cursor = 'pointer';
-      } else {
-        setHoveredDomainId(null);
-        container.style.cursor = 'default';
-      }
-    };
-
-    const handleClick = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect();
-      mouseVec.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseVec.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(mouseVec, camera);
-
-      const intersects = raycaster.intersectObjects(interactiveMeshes);
-      if (intersects.length > 0) {
-        const domainId = intersects[0].object.userData.domainId;
-        const clicked = OPERATIONAL_DOMAINS.find(d => d.id === domainId);
-        if (clicked) handleDomainClick(clicked);
-      }
+      targetMouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 1.2;
+      targetMouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.8;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        const rect = container.getBoundingClientRect();
-        targetX = ((e.touches[0].clientX - rect.left) / rect.width - 0.5) * 1.5;
-        targetY = ((e.touches[0].clientY - rect.top) / rect.height - 0.5) * 1.5;
-      }
+      if (!interactive || e.touches.length === 0) return;
+      const rect = container.getBoundingClientRect();
+      targetMouseX = ((e.touches[0].clientX - rect.left) / rect.width - 0.5) * 1.0;
+      targetMouseY = ((e.touches[0].clientY - rect.top) / rect.height - 0.5) * 0.6;
     };
 
     container.addEventListener('mousemove', handleMouseMove, { passive: true });
     container.addEventListener('touchmove', handleTouchMove, { passive: true });
-    container.addEventListener('click', handleClick);
 
     const handleResize = () => {
       if (!container || !renderer) return;
-      const isMobile = container.clientWidth < 640;
-      camera.fov = isMobile ? 54 : 42;
-      camera.position.z = isMobile ? 14.0 : 12.0;
+      const isMob = container.clientWidth < 640;
+      camera.fov = isMob ? 54 : 44;
+      camera.position.z = isMob ? 14.5 : 12.2;
       camera.aspect = container.clientWidth / container.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -335,67 +369,106 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
     // ANIMATION LOOP
     let animationFrameId: number;
     const clock = new THREE.Clock();
+    let shockwaveRadius = 1.0;
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
-      const speed = prefersReducedMotion ? 0.05 : 0.65;
+      const speed = prefersReducedMotion ? 0.05 : 0.6;
+      const currentMode = modeRef.current;
 
-      mouseX += (targetX - mouseX) * 0.05;
-      mouseY += (targetY - mouseY) * 0.05;
+      // Parallax damping
+      curMouseX += (targetMouseX - curMouseX) * 0.05;
+      curMouseY += (targetMouseY - curMouseY) * 0.05;
 
-      camera.position.x = mouseX;
-      camera.position.y = 1.8 - mouseY * 0.5;
+      // Camera base positioning based on mode
+      let targetCamX = curMouseX;
+      let targetCamY = 1.6 - curMouseY * 0.5;
+      let targetCamZ = isMobile ? 14.5 : 12.2;
+
+      if (currentMode === 'anticipate' || currentMode === 'scenario') {
+        // Subtle drift toward the Sales/Operations/Customer quadrant
+        targetCamX += 0.8;
+        targetCamY += -0.4;
+        targetCamZ += -1.0;
+      } else if (currentMode === 'orchestrate') {
+        // Slightly higher isometric overview
+        targetCamY += 1.2;
+      }
+
+      camera.position.x += (targetCamX - camera.position.x) * 0.04;
+      camera.position.y += (targetCamY - camera.position.y) * 0.04;
+      camera.position.z += (targetCamZ - camera.position.z) * 0.04;
       camera.lookAt(0, 0, 0);
 
       // Core rotation
-      coreGroup.rotation.y = elapsedTime * 0.25 * speed;
-      coreGroup.rotation.x = Math.sin(elapsedTime * 0.3 * speed) * 0.12;
-      gyroRing1.rotation.z = elapsedTime * 0.35 * speed;
-      gyroRing2.rotation.y = -elapsedTime * 0.3 * speed;
+      coreGroup.rotation.y = elapsedTime * 0.22 * speed;
+      coreGroup.rotation.x = Math.sin(elapsedTime * 0.25 * speed) * 0.1;
+      ring1.rotation.z = elapsedTime * 0.3 * speed;
+      ring2.rotation.y = -elapsedTime * 0.25 * speed;
 
-      // Stage behavior (equilibrium vs fragmentation)
-      const isFragmented = currentStage === 'fragmentation';
-      const expansion = isFragmented ? 2.1 : 1.0;
+      // Shockwave ring animation (active in orchestrate mode)
+      if (currentMode === 'orchestrate') {
+        shockwaveRadius += 0.045 * speed;
+        if (shockwaveRadius > 6.5) shockwaveRadius = 1.0;
+        shockwaveMesh.scale.set(shockwaveRadius, shockwaveRadius, shockwaveRadius);
+        const fade = Math.max(0, 1.0 - (shockwaveRadius - 1.0) / 5.5);
+        shockwaveMat.opacity = fade * 0.65;
+        shockwaveMesh.visible = true;
+      } else {
+        shockwaveMat.opacity = 0;
+        shockwaveMesh.visible = false;
+        shockwaveRadius = 1.0;
+      }
 
+      // Domain nodes animation
       domainNodes.forEach((node) => {
-        const isSelected = selectedDomain.id === node.domain.id;
+        // Node spinning
+        node.coreMesh.rotation.y = elapsedTime * 0.6 * speed;
+        node.shellMesh.rotation.y = -elapsedTime * 0.35 * speed;
+        node.ringMesh.rotation.z = elapsedTime * 0.45 * speed;
 
-        node.targetPosition.copy(node.basePosition).multiplyScalar(expansion);
-        node.currentPosition.lerp(node.targetPosition, 0.06);
+        // Visual emphasis based on mode
+        const isFocusNode = currentMode === 'anticipate' || currentMode === 'scenario'
+          ? (node.id === 'sales' || node.id === 'operations' || node.id === 'customers' || node.id === 'finance')
+          : true;
 
-        node.mesh.position.copy(node.currentPosition);
-        node.shellMesh.position.copy(node.currentPosition);
-        node.ringMesh.position.copy(node.currentPosition);
+        const targetScale = isFocusNode ? (currentMode === 'anticipate' ? 1.22 : 1.0) : 0.75;
+        node.group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.08);
 
-        node.mesh.rotation.y = elapsedTime * 0.7 * speed;
-        node.shellMesh.rotation.y = -elapsedTime * 0.4 * speed;
-        node.ringMesh.rotation.z = elapsedTime * 0.5 * speed;
-
-        // Scale selected node
-        const targetScale = isSelected ? 1.25 : 1.0;
-        node.mesh.scale.setScalar(targetScale);
-        node.shellMesh.scale.setScalar(targetScale);
-
-        // Update spline curve
-        const midPoint = node.currentPosition.clone().multiplyScalar(0.5);
-        node.curveToCore.points[0].copy(node.currentPosition);
-        node.curveToCore.points[1].copy(midPoint);
-        const pts = node.curveToCore.getPoints(36);
-        node.lineMesh.geometry.setFromPoints(pts);
-
-        // Spline opacity
-        (node.lineMesh.material as THREE.LineBasicMaterial).opacity = isFragmented ? 0.08 : (isSelected ? 0.85 : 0.35);
+        // Core spline opacity
+        const baseOpacity = currentMode === 'understand' ? 0.55 : (isFocusNode ? 0.45 : 0.15);
+        (node.lineMesh.material as THREE.LineBasicMaterial).opacity = baseOpacity;
 
         // Advance packet particles
+        const packetSpeedMultiplier = isFocusNode && (currentMode === 'anticipate' || currentMode === 'orchestrate') ? 1.6 : 1.0;
         node.packetProgress.forEach((prog, pIdx) => {
-          node.packetProgress[pIdx] = (prog + 0.0035 * speed * (isSelected ? 2.0 : 1.0)) % 1;
+          node.packetProgress[pIdx] = (prog + 0.0032 * speed * packetSpeedMultiplier) % 1;
           const pos = node.curveToCore.getPoint(node.packetProgress[pIdx]);
           if (node.packetMeshes[pIdx]) {
             node.packetMeshes[pIdx].position.copy(pos);
-            node.packetMeshes[pIdx].visible = !isFragmented;
+            node.packetMeshes[pIdx].visible = isFocusNode;
           }
         });
+      });
+
+      // Filaments opacity based on mode
+      filaments.forEach((fil) => {
+        const isScenarioFilament =
+          (fil.idA === 'sales' && fil.idB === 'operations') ||
+          (fil.idA === 'operations' && fil.idB === 'customers') ||
+          (fil.idA === 'customers' && fil.idB === 'finance') ||
+          (fil.idA === 'finance' && fil.idB === 'sales');
+
+        let targetOpacity = 0.22;
+        if (currentMode === 'understand') {
+          targetOpacity = 0.42; // Fully illuminated web
+        } else if (currentMode === 'anticipate' || currentMode === 'scenario') {
+          targetOpacity = isScenarioFilament ? 0.85 : 0.08;
+        } else if (currentMode === 'orchestrate') {
+          targetOpacity = 0.35;
+        }
+        (fil.line.material as THREE.LineBasicMaterial).opacity = targetOpacity;
       });
 
       renderer.render(scene, camera);
@@ -407,11 +480,10 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
       cancelAnimationFrame(animationFrameId);
       container.removeEventListener('mousemove', handleMouseMove);
       container.removeEventListener('touchmove', handleTouchMove);
-      container.removeEventListener('click', handleClick);
       window.removeEventListener('resize', handleResize);
 
       scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {
           obj.geometry.dispose();
           if (Array.isArray(obj.material)) {
             obj.material.forEach((m) => m.dispose());
@@ -422,162 +494,52 @@ export const ContinuousEnterprise3D: React.FC<ContinuousEnterprise3DProps> = ({
       });
       renderer.dispose();
     };
-  }, [selectedDomain, currentStage, handleDomainClick]);
+  }, [interactive]);
 
   return (
     <div className={`relative w-full h-full select-none overflow-hidden ${className}`} ref={containerRef}>
-      
-      {/* 3D WebGL Canvas */}
       {webGLSupported ? (
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full block z-0 outline-none"
-          aria-label="3D continuous enterprise neural core visualizer"
+          aria-label="3D continuous enterprise neural network visualizer"
         />
       ) : (
-        /* High-Craft Architectural SVG Fallback: Zero Overlap, Clean & Polished */
-        <div className="absolute inset-0 w-full h-full flex items-center justify-center p-4 bg-[#080b11]">
-          <svg className="w-full h-full max-w-2xl max-h-full select-none" viewBox="0 0 640 480">
+        /* Minimal Clean Architectural SVG Fallback */
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center p-6 bg-[#07080B]">
+          <svg className="w-full h-full max-w-xl max-h-full" viewBox="0 0 600 450">
             <defs>
-              <radialGradient id="heroCoreGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.8" />
-                <stop offset="45%" stopColor="#0284c7" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#080b11" stopOpacity="0" />
+              <radialGradient id="fallbackGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.7" />
+                <stop offset="60%" stopColor="#0284c7" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="#07080b" stopOpacity="0" />
               </radialGradient>
-              <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
             </defs>
-
-            {/* Orbital Guide Rings with Micro-Ticks */}
-            <circle cx="320" cy="240" r="195" fill="none" stroke="#ffffff" strokeOpacity="0.04" strokeDasharray="4 8" />
-            <circle cx="320" cy="240" r="150" fill="none" stroke="#38bdf8" strokeOpacity="0.12" strokeDasharray="3 6" />
-            <circle cx="320" cy="240" r="95" fill="none" stroke="#38bdf8" strokeOpacity="0.18" />
-
-            {/* Central Synapse Intelligence Core */}
-            <circle cx="320" cy="240" r="70" fill="url(#heroCoreGlow)" />
-            <circle cx="320" cy="240" r="42" fill="#090d16" stroke="#38bdf8" strokeWidth="1.5" />
-            <circle cx="320" cy="240" r="26" fill="#0284c7" fillOpacity="0.3" stroke="#00e5ff" strokeWidth="1.5" />
-            <circle cx="320" cy="240" r="10" fill="#38bdf8" />
-            
-            <text x="320" y="236" textAnchor="middle" fill="#ffffff" fontSize="11" fontFamily="monospace" fontWeight="700" letterSpacing="0.12em">
+            <circle cx="300" cy="225" r="70" fill="url(#fallbackGlow)" />
+            <circle cx="300" cy="225" r="32" fill="#090d16" stroke="#38bdf8" strokeWidth="1.5" />
+            <text x="300" y="222" textAnchor="middle" fill="#ffffff" fontSize="10" fontFamily="monospace" fontWeight="700" letterSpacing="0.1em">
               SYNAPSE
             </text>
-            <text x="320" y="249" textAnchor="middle" fill="#38bdf8" fontSize="8" fontFamily="monospace" letterSpacing="0.16em">
-              INTELLIGENCE CORE
+            <text x="300" y="234" textAnchor="middle" fill="#38bdf8" fontSize="7" fontFamily="monospace" letterSpacing="0.15em">
+              OPERATING SYSTEM
             </text>
-
-            {/* 8 Operational Domain Nodes (Arranged with Generous 45° Radial Separation) */}
             {OPERATIONAL_DOMAINS.map((domain, i) => {
               const angle = (i / OPERATIONAL_DOMAINS.length) * Math.PI * 2 - Math.PI / 2;
-              const radius = 155;
-              const x = 320 + Math.cos(angle) * radius;
-              const y = 240 + Math.sin(angle) * radius;
-              const isSelected = selectedDomain.id === domain.id;
-              const isHovered = hoveredDomainId === domain.id;
-
-              // Text position offset (placed slightly outside node to avoid ANY overlap)
-              const labelRadius = radius + 32;
-              const labelX = 320 + Math.cos(angle) * labelRadius;
-              const labelY = 240 + Math.sin(angle) * labelRadius + 4;
-
+              const x = 300 + Math.cos(angle) * 140;
+              const y = 225 + Math.sin(angle) * 140;
               return (
-                <g
-                  key={domain.id}
-                  onClick={() => handleDomainClick(domain)}
-                  onMouseEnter={() => setHoveredDomainId(domain.id)}
-                  onMouseLeave={() => setHoveredDomainId(null)}
-                  className="cursor-pointer transition-all duration-200"
-                >
-                  {/* Connecting Neural Spline */}
-                  <line
-                    x1="320"
-                    y1="240"
-                    x2={x}
-                    y2={y}
-                    stroke={domain.color}
-                    strokeWidth={isSelected ? 2 : 1}
-                    strokeOpacity={isSelected ? 0.85 : 0.25}
-                    strokeDasharray={isSelected ? 'none' : '4 4'}
-                  />
-
-                  {/* Outer Pulsing Halo when active */}
-                  {isSelected && (
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r="28"
-                      fill="none"
-                      stroke={domain.color}
-                      strokeWidth="1.5"
-                      strokeOpacity="0.5"
-                      strokeDasharray="3 3"
-                    />
-                  )}
-
-                  {/* Node Capsule Disc */}
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={isSelected ? 18 : 14}
-                    fill="#0a0e17"
-                    stroke={domain.color}
-                    strokeWidth={isSelected ? 2.5 : 1.5}
-                    filter={isSelected || isHovered ? 'url(#nodeGlow)' : undefined}
-                  />
-
-                  {/* Inner Status Pip */}
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r="4"
-                    fill={domain.color}
-                  />
-
-                  {/* Clean, Full Domain Name Badge (Positioned Radially to Prevent Overlap) */}
-                  <g transform={`translate(${labelX}, ${labelY})`}>
-                    <rect
-                      x="-38"
-                      y="-11"
-                      width="76"
-                      height="20"
-                      rx="10"
-                      fill="#070a10"
-                      fillOpacity="0.9"
-                      stroke={isSelected ? domain.color : 'rgba(255,255,255,0.1)'}
-                      strokeWidth={isSelected ? '1.5' : '1'}
-                    />
-                    <text
-                      x="0"
-                      y="3"
-                      textAnchor="middle"
-                      fill={isSelected ? '#ffffff' : '#94a3b8'}
-                      fontSize="8.5"
-                      fontFamily="monospace"
-                      fontWeight={isSelected ? '700' : '500'}
-                      letterSpacing="0.08em"
-                    >
-                      {domain.name.toUpperCase()}
-                    </text>
-                  </g>
+                <g key={domain.id}>
+                  <line x1="300" y1="225" x2={x} y2={y} stroke={domain.color} strokeWidth="1" strokeOpacity="0.35" />
+                  <circle cx={x} cy={y} r="12" fill="#0a0e17" stroke={domain.color} strokeWidth="1.5" />
+                  <text x={x} y={y + 3} textAnchor="middle" fill="#e2e8f0" fontSize="7" fontFamily="monospace" fontWeight="600">
+                    {domain.name.substring(0, 4).toUpperCase()}
+                  </text>
                 </g>
               );
             })}
           </svg>
         </div>
       )}
-
-      {/* Sleek Top-Left Status HUD Pill (Non-intrusive) */}
-      <div className="absolute top-3 left-4 z-10 pointer-events-none">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0d121c]/90 border border-white/10 backdrop-blur-md shadow-lg">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span className="text-[11px] font-mono tracking-wider uppercase text-slate-300">
-            ENTERPRISE TOPOLOGY // {selectedDomain.name.toUpperCase()} NODE SELECTED
-          </span>
-        </div>
-      </div>
-
     </div>
   );
 };

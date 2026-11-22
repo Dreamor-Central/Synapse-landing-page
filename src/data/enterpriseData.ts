@@ -1,419 +1,179 @@
-import type { OperationalDomain, ProblemIsland, HowItWorksStage, BusinessSignal, Capability } from '../types';
+import type { OperationalDomain, CoreCapability, ScenarioSignal, ScenarioIntervention } from '../types';
 
 export const OPERATIONAL_DOMAINS: OperationalDomain[] = [
   {
-    id: 'finance',
-    name: 'Finance',
-    category: 'Capital & Treasury',
-    color: '#38BDF8', // Cyan
-    description: 'Real-time liquidity, unit economics, working capital, and margin variance across business lines.',
-    systems: ['SAP S/4HANA', 'NetSuite', 'Anaplan', 'Stripe'],
-    metrics: [
-      { label: 'EBITDA Margin', value: '26.4%', trend: 'nominal', status: 'good' },
-      { label: 'Working Capital', value: '$84.2M', trend: 'down', status: 'warning' },
-      { label: 'Cash Flow Velocity', value: '1.4x', trend: 'nominal', status: 'good' }
-    ],
-    connections: ['operations', 'sales', 'strategy', 'supply-chain'],
-    throughput: '42.8k events/sec',
-    latency: '< 18ms'
+    id: 'sales',
+    name: 'Sales',
+    category: 'Pipeline & Demand',
+    color: '#38BDF8', // Sky Cyan
+    description: 'Customer commitments, deal velocity, and inbound demand signals.',
+    systems: ['CRM', 'Pipeline Management', 'Customer Interactions'],
+    connections: ['operations', 'marketing', 'finance', 'customers']
   },
   {
-    id: 'people',
-    name: 'People',
-    category: 'Talent & Capacity',
-    color: '#818CF8', // Indigo
-    description: 'Engineering capacity, recruitment velocity, organizational load, and skill distribution.',
-    systems: ['Workday', 'Greenhouse', 'Lattice', 'CultureAmp'],
-    metrics: [
-      { label: 'Utilization Index', value: '88.2%', trend: 'up', status: 'warning' },
-      { label: 'Time-to-Hire', value: '31 Days', trend: 'nominal', status: 'good' },
-      { label: 'Attrition Risk', value: '3.1%', trend: 'nominal', status: 'good' }
-    ],
-    connections: ['operations', 'strategy', 'finance'],
-    throughput: '8.4k events/sec',
-    latency: '< 24ms'
+    id: 'operations',
+    name: 'Operations',
+    category: 'Execution & Fulfilment',
+    color: '#F59E0B', // Amber
+    description: 'Fulfilment capacity, delivery lead times, and workflow constraints.',
+    systems: ['WMS', 'Logistics', 'Service Queues'],
+    connections: ['sales', 'supply-chain', 'customers', 'finance']
   },
   {
     id: 'customers',
     name: 'Customers',
-    category: 'Retention & Value',
+    category: 'Experience & Retention',
     color: '#34D399', // Emerald
-    description: 'Cohort retention, churn leading indicators, sentiment signals, and lifetime value.',
-    systems: ['Segment', 'Snowflake', 'Gainsight', 'Zendesk'],
-    metrics: [
-      { label: 'Net Retention (NDR)', value: '118.5%', trend: 'nominal', status: 'good' },
-      { label: 'CSAT Score', value: '4.82/5', trend: 'nominal', status: 'good' },
-      { label: 'Expansion Rate', value: '+24%', trend: 'up', status: 'good' }
-    ],
-    connections: ['sales', 'marketing', 'operations', 'strategy'],
-    throughput: '124.6k events/sec',
-    latency: '< 12ms'
+    description: 'Delivery feedback, satisfaction trends, and renewal health.',
+    systems: ['Support Helpdesk', 'Customer Success', 'Feedback Loops'],
+    connections: ['operations', 'sales', 'marketing']
   },
   {
-    id: 'operations',
-    name: 'Operations',
-    category: 'Execution & Throughput',
-    color: '#F59E0B', // Amber
-    description: 'Infrastructure latency, service level fulfillment, support ticket resolution, and workflow bottlenecks.',
-    systems: ['Datadog', 'Jira Service', 'PagerDuty', 'ServiceNow'],
-    metrics: [
-      { label: 'SLA Adherence', value: '99.94%', trend: 'nominal', status: 'good' },
-      { label: 'Fulfillment Cycle', value: '1.8 Days', trend: 'nominal', status: 'good' },
-      { label: 'System Queue Depth', value: '412 ops', trend: 'down', status: 'good' }
-    ],
-    connections: ['finance', 'people', 'supply-chain', 'customers'],
-    throughput: '310.2k events/sec',
-    latency: '< 8ms'
-  },
-  {
-    id: 'sales',
-    name: 'Sales',
-    category: 'Revenue Pipeline',
-    color: '#60A5FA', // Blue
-    description: 'Contract velocity, enterprise pipeline health, win rates, and regional quota distribution.',
-    systems: ['Salesforce CRM', 'Clari', 'Gong', 'Highspot'],
-    metrics: [
-      { label: 'Qualified Pipeline', value: '$148.6M', trend: 'up', status: 'good' },
-      { label: 'Win Rate', value: '34.2%', trend: 'nominal', status: 'good' },
-      { label: 'Sales Cycle', value: '62 Days', trend: 'down', status: 'good' }
-    ],
-    connections: ['marketing', 'customers', 'finance', 'operations'],
-    throughput: '19.4k events/sec',
-    latency: '< 20ms'
+    id: 'finance',
+    name: 'Finance',
+    category: 'Capital & Costs',
+    color: '#818CF8', // Indigo
+    description: 'Operational expenses, margin dynamics, and capital allocation.',
+    systems: ['General Ledger', 'Billing', 'Financial Planning'],
+    connections: ['operations', 'sales', 'strategy']
   },
   {
     id: 'marketing',
     name: 'Marketing',
-    category: 'Demand & Acquisition',
+    category: 'Demand Generation',
     color: '#EC4899', // Pink
-    description: 'Blended acquisition efficiency, pipeline contribution, campaign attribution, and market signals.',
-    systems: ['Marketo', 'Google Ads', 'LinkedIn B2B', 'Meta API'],
-    metrics: [
-      { label: 'Blended CAC', value: '$1,840', trend: 'nominal', status: 'good' },
-      { label: 'Pipeline Inbound', value: '$28.4M', trend: 'up', status: 'good' },
-      { label: 'MQL to SQL Ratio', value: '42.1%', trend: 'nominal', status: 'good' }
-    ],
-    connections: ['sales', 'customers', 'finance'],
-    throughput: '78.2k events/sec',
-    latency: '< 15ms'
+    description: 'Campaign activity, lead acquisition, and market positioning.',
+    systems: ['Ad Channels', 'Automation', 'Analytics'],
+    connections: ['sales', 'customers']
   },
   {
     id: 'supply-chain',
     name: 'Supply Chain',
-    category: 'Inventory & Logistics',
+    category: 'Inventory & Procurement',
     color: '#F97316', // Orange
-    description: 'Tier-1 vendor reliability, inventory safety stock, logistics freight times, and lead times.',
-    systems: ['Oracle SCM', 'Manhattan Associates', 'Project44', 'SAP TM'],
-    metrics: [
-      { label: 'Inventory Turnover', value: '6.8x', trend: 'nominal', status: 'good' },
-      { label: 'Vendor Fill Rate', value: '97.2%', trend: 'down', status: 'warning' },
-      { label: 'In-Transit Buffer', value: '14.2 Days', trend: 'nominal', status: 'good' }
-    ],
-    connections: ['operations', 'finance', 'strategy'],
-    throughput: '34.1k events/sec',
-    latency: '< 22ms'
-  },
-  {
-    id: 'strategy',
-    name: 'Strategy',
-    category: 'Executive Alignment',
-    color: '#A855F7', // Purple
-    description: 'Long-term corporate capital allocation, strategic OKR tracking, and scenario probabilities.',
-    systems: ['WorkBoard', 'Planview', 'Looker Core', 'Board Books'],
-    metrics: [
-      { label: 'Strategic Alignment', value: '94.0%', trend: 'nominal', status: 'good' },
-      { label: 'Scenario Convergence', value: '91.8%', trend: 'up', status: 'good' },
-      { label: 'CapEx Efficiency', value: '3.4x ROI', trend: 'nominal', status: 'good' }
-    ],
-    connections: ['finance', 'people', 'customers', 'operations', 'sales'],
-    throughput: '4.2k events/sec',
-    latency: '< 30ms'
-  }
-];
-
-export const PROBLEM_ISLANDS: ProblemIsland[] = [
-  {
-    id: 'finance',
-    name: 'Finance',
-    toolset: 'ERP & Accounting (SAP, NetSuite, Excel)',
-    isolatedView: 'Historical revenue, margin reports, and monthly expense close.',
-    dataLatency: '30 to 45 days batch reconciliation',
-    blindspot: 'Has no visibility into real-time operational capacity or customer churn leading indicators.',
-    impactOnSurge: 'Discovers margin compression 45 days too late when expedited shipping invoices hit.',
-    status: 'normal'
-  },
-  {
-    id: 'marketing',
-    name: 'Marketing',
-    toolset: 'Ad Platforms & Attribution (Google, LinkedIn, Marketo)',
-    isolatedView: 'Lead volume, impressions, CTR, and top-of-funnel conversion.',
-    dataLatency: '24 to 48 hours attribution reporting',
-    blindspot: 'Assumes infinite warehouse inventory and instant fulfillment capability.',
-    impactOnSurge: 'Doubles ad spend to capture surging demand, pulling in low-margin orders.',
-    status: 'stressed'
-  },
-  {
-    id: 'sales',
-    name: 'Sales',
-    toolset: 'CRM & Pipeline (Salesforce, Clari, Outreach)',
-    isolatedView: 'Closed-won deals, quota attainment, and open opportunities.',
-    dataLatency: 'Weekly forecast calls and manual rep updates',
-    blindspot: 'Unaware that factory lines are already at 104% capacity limits.',
-    impactOnSurge: 'Overpromises expedited 3-day deliveries to hit quarterly bonuses.',
-    status: 'stressed'
-  },
-  {
-    id: 'operations',
-    name: 'Operations',
-    toolset: 'SCM, WMS & Logistics (Oracle, Manhattan, Jira)',
-    isolatedView: 'Warehouse throughput, truck schedules, and shipping backlogs.',
-    dataLatency: 'Shift-by-shift batch reports',
-    blindspot: 'Has zero forewarning about the inbound marketing traffic wave.',
-    impactOnSurge: 'Warehouse bottlenecks collapse under 160% load; SLA breach rate surges.',
-    status: 'critical'
+    description: 'Component availability, vendor delivery schedules, and buffer stock.',
+    systems: ['Procurement', 'Inventory Management'],
+    connections: ['operations', 'finance']
   },
   {
     id: 'people',
     name: 'People',
-    toolset: 'HRIS & Staffing (Workday, Greenhouse)',
-    isolatedView: 'Headcount plan, open job requisitions, and payroll.',
-    dataLatency: 'Monthly talent review reviews',
-    blindspot: 'Cannot dynamically redistribute talent to triage operational backlogs.',
-    impactOnSurge: 'Overtime costs surge 300%; staff burnout accelerates voluntary departures.',
-    status: 'critical'
+    category: 'Organizational Capacity',
+    color: '#A855F7', // Purple
+    description: 'Team capacity, skill distribution, and workload balancing.',
+    systems: ['HRIS', 'Staffing Management'],
+    connections: ['operations', 'strategy']
+  },
+  {
+    id: 'strategy',
+    name: 'Strategy',
+    category: 'Leadership Alignment',
+    color: '#00E5FF', // Electric Cyan
+    description: 'Organizational goals, investment priorities, and cross-team alignment.',
+    systems: ['Planning Tools', 'Executive Roadmaps'],
+    connections: ['finance', 'people', 'operations', 'sales']
   }
 ];
 
-export const HOW_IT_WORKS_STAGES: HowItWorksStage[] = [
+export const CORE_CAPABILITIES: CoreCapability[] = [
   {
+    id: 'understand',
     step: '01',
-    title: 'Connect',
-    headline: 'Unified Organisational Data',
-    description: 'Bring information from your existing systems into one connected environment — without replacing your tools.',
-    details: [
-      'Zero-lift native connectors for ERP, CRM, HRIS, Data Lakes, WMS, and custom APIs.',
-      'Heterogeneous schema reconciliation and semantic normalization in real-time.',
-      'Preserves existing permissions, enterprise security policies, and RBAC governance.'
-    ],
-    metricsPreview: [
-      { label: 'Supported Integrations', value: '180+ Enterprise Connectors' },
-      { label: 'Ingestion Latency', value: '< 250ms Global Pipeline' },
-      { label: 'Data Fidelity', value: '100% Immutable Provenance' }
-    ],
-    systemCapability: 'Connects fragmented silos into one living operational substrate.'
+    title: 'UNDERSTAND',
+    headline: 'See your business as an interconnected system.',
+    description: 'See how your entire business works and how its different parts influence one another.',
+    visualFocus: 'Continuous enterprise network illumination',
+    visualStateDescription: 'The entire organisation becomes visible as a unified system, linking data streams across departments without replacing existing software.',
+    points: [
+      'Connects disparate software and data sources into a coherent picture',
+      'Reveals hidden dependencies between seemingly separate business functions',
+      'Provides a shared, continuously calibrated understanding of organisational reality'
+    ]
   },
   {
+    id: 'anticipate',
     step: '02',
-    title: 'Understand',
-    headline: 'Cross-Department Causal Mapping',
-    description: 'Discover relationships between departments, processes, resources, and business outcomes.',
-    details: [
-      'Constructs an evolving, continuously calibrated causal knowledge graph of the entire enterprise.',
-      'Identifies hidden dependencies (e.g. how a 5% delay in fulfillment impacts Q3 customer renewals).',
-      'Eliminates departmental blind spots with unified organizational semantics.'
-    ],
-    metricsPreview: [
-      { label: 'Graph Entities', value: '4.2M Interconnected Nodes' },
-      { label: 'Causal Edge Discovery', value: 'Continuous Inference' },
-      { label: 'Dependency Visibility', value: '360° Cross-Functional' }
-    ],
-    systemCapability: 'Maps how every department silently influences every other department.'
+    title: 'ANTICIPATE',
+    headline: 'Identify emerging developments before they become crises.',
+    description: 'Identify emerging problems and opportunities before they become bigger issues.',
+    visualFocus: 'Predictive signal pathways and causal highlighting',
+    visualStateDescription: 'Cross-functional pathways pulse with warning amber and purple highlights, showing leading indicators across departments before they surface in financial statements.',
+    points: [
+      'Surfaces leading operational indicators rather than relying on delayed reporting',
+      'Traces how changes in one department quietly create ripple effects in another',
+      'Gives leadership and team leads time to act proactively rather than reactively'
+    ]
   },
   {
+    id: 'orchestrate',
     step: '03',
-    title: 'Anticipate',
-    headline: 'Predictive Organisational Intelligence',
-    description: 'Identify emerging risks, opportunities, and possible future outcomes weeks before they appear in financial statements.',
-    details: [
-      'Detects leading indicators rather than relying on lagging quarterly accounting reports.',
-      'Flags non-linear ripple effects across supply chain, customer sentiment, and cash burn.',
-      'Quantifies confidence intervals and stochastic risk horizons across all business lines.'
-    ],
-    metricsPreview: [
-      { label: 'Early Warning Lead Time', value: '14 to 45 Days Ahead' },
-      { label: 'Predictive Trajectory', value: 'Rolling 90-Day Forecast' },
-      { label: 'Anomaly Detection', value: 'Sub-minute Anomaly Alerts' }
-    ],
-    systemCapability: 'Forecasts organizational consequences before they become irreversible.'
-  },
-  {
-    step: '04',
-    title: 'Simulate',
-    headline: 'Executive Decision Sandbox',
-    description: 'Explore different decisions and understand their potential consequences before committing capital or personnel.',
-    details: [
-      'Run counterfactual simulations: "What if we increase marketing budget by 30% while vendor lead time slips 10 days?"',
-      'Evaluate trade-offs between short-term margin, customer retention, and operational strain.',
-      'Test multi-department interventions in a risk-free digital twin of your enterprise.'
-    ],
-    metricsPreview: [
-      { label: 'Simulation Fidelity', value: 'Monte Carlo Stochastic Engine' },
-      { label: 'Scenario Turnaround', value: '< 3.2 Seconds / Run' },
-      { label: 'Sensitivity Analysis', value: 'Multi-variable Stress Testing' }
-    ],
-    systemCapability: 'Provides a pre-flight flight simulator for leadership and operations.'
-  },
-  {
-    step: '05',
-    title: 'Orchestrate',
-    headline: 'Coordinated Workflow Execution',
-    description: 'Turn decisions into coordinated actions across the organisation, with appropriate human oversight and permissions.',
-    details: [
-      'Dispatches unified operational directives across Salesforce, SAP, Jira, Slack, and Workday in lockstep.',
-      'Human-in-the-loop executive authorization prevents unilateral or accidental system changes.',
-      'Maintains complete cryptographically verifiable audit trails of all system-suggested actions.'
-    ],
-    metricsPreview: [
-      { label: 'Action Dispatch', value: 'Multi-system Coordinated Push' },
-      { label: 'Human Governance', value: 'Role-Based Dual Signoff' },
-      { label: 'Execution Audit', value: 'Full Forensic Lineage' }
-    ],
-    systemCapability: 'Bridges executive strategy and frontline operational execution.'
+    title: 'ORCHESTRATE',
+    headline: 'Evaluate choices and coordinate action across teams.',
+    description: 'Evaluate decisions, explore possible outcomes, and coordinate actions across your business.',
+    visualFocus: 'Synchronized directive wavefronts and action ripple',
+    visualStateDescription: 'Directive waves radiate outward from the core to all domain nodes, demonstrating synchronized action dispatch with human oversight.',
+    points: [
+      'Explore possible decisions and evaluate their consequences in a risk-free environment',
+      'Align cross-departmental teams around shared operational priorities',
+      'Coordinate execution across systems with role-based human oversight'
+    ]
   }
 ];
 
-export const BUSINESS_SIGNALS: BusinessSignal[] = [
+export const SCENARIO_SIGNALS: ScenarioSignal[] = [
   {
-    id: 'cac',
-    department: 'Marketing',
-    name: 'Customer Acquisition Cost',
-    metric: '$2,480',
-    delta: '+38%',
-    direction: 'up',
-    severity: 'warning',
-    causalLink: 'Paid channels scaled aggressively into non-core target segments.'
-  },
-  {
-    id: 'cvr',
+    id: 'sig-sales',
     department: 'Sales',
-    name: 'Conversion Rate',
-    metric: '14.2%',
-    delta: '-22%',
-    direction: 'down',
-    severity: 'critical',
-    causalLink: 'Lower lead quality coupled with longer quoted lead times discouraged buyers.'
+    observation: 'Demand is increasing',
+    detail: 'Order intake is climbing as new customer contracts are closed, but commitments are made without visibility into current warehouse constraints.',
+    color: '#38BDF8'
   },
   {
-    id: 'fulfillment',
+    id: 'sig-ops',
     department: 'Operations',
-    name: 'Fulfillment Delays',
-    metric: '7.8 Days',
-    delta: '+5.2 days',
-    direction: 'up',
-    severity: 'critical',
-    causalLink: 'Warehouse staffing shortages and warehouse capacity constraints reached ceiling.'
+    observation: 'Fulfilment capacity is under pressure',
+    detail: 'Warehouse processing and delivery queues are stretched to their limits, causing fulfillment buffers to erode rapidly.',
+    color: '#F59E0B'
   },
   {
-    id: 'retention',
+    id: 'sig-cust',
     department: 'Customers',
-    name: 'Customer Retention Rate',
-    metric: '76.4%',
-    delta: '-18%',
-    direction: 'down',
-    severity: 'critical',
-    causalLink: 'Shipping delays and support ticket backlog drove high churn in premium accounts.'
+    observation: 'Delivery delays are affecting satisfaction',
+    detail: 'Shipment timelines slip beyond promised dates, leading to an influx of support inquiries and customer frustration.',
+    color: '#34D399'
   },
   {
-    id: 'opex',
+    id: 'sig-fin',
     department: 'Finance',
-    name: 'Operating Costs',
-    metric: '$14.2M/mo',
-    delta: '+14%',
-    direction: 'up',
-    severity: 'warning',
-    causalLink: 'Emergency air freight, overtime labor premiums, and customer concession credits.'
+    observation: 'Operational inefficiencies may be increasing costs',
+    detail: 'Emergency expediting, overtime, and handling delays quietly compress operating margins before invoices are reconciled.',
+    color: '#818CF8'
   }
 ];
 
-export const CORE_CAPABILITIES: Capability[] = [
+export const SCENARIO_INTERVENTIONS: ScenarioIntervention[] = [
   {
-    id: 'unified-intelligence',
-    title: 'Unified Intelligence',
-    eyebrow: '01 / FOUNDATION',
-    tagline: 'Connect fragmented organisational information into one coherent picture.',
-    description: 'Breaks down corporate data silos without forcing costly tool migrations. Continuously synthesizes heterogeneous enterprise databases, SaaS APIs, unstructured communications, and operational logs into a single canonical ontology.',
-    technicalArchitecture: [
-      'Semantic ontology ingestion pipeline',
-      'Entity resolution across multi-vendor ERP/CRM records',
-      'Automated schema drift adaptation & reconciliation',
-      'Zero-copy federated data virtualization'
-    ],
-    operationalOutcome: 'Every executive and system reads from the exact same single source of corporate truth.',
-    telemetryMetric: { label: 'Data Harmonization', value: '99.8%' }
+    title: 'Adjust sales commitments based on fulfilment capacity',
+    department: 'Sales & Delivery',
+    description: 'Dynamically calibrate delivery promises so quotes reflect actual fulfillment lead times.',
+    impact: 'Prevents customer disappointment and restores delivery trust.'
   },
   {
-    id: 'operational-understanding',
-    title: 'Operational Understanding',
-    eyebrow: '02 / REASONING',
-    tagline: 'Understand how departments, workflows, people and resources interact.',
-    description: 'Replaces static quarterly reporting with an organic, continuously updated understanding of organisational reality. Traces how headcount constraints in engineering cascade into delivery bottlenecks and ultimately cashflow fluctuations.',
-    technicalArchitecture: [
-      'High-cardinality causal Bayesian DAG networks',
-      'Process mining telemetry extraction',
-      'Cross-departmental latency profiling',
-      'Systemic bottleneck detection engines'
-    ],
-    operationalOutcome: 'Reveals the hidden causal mechanisms that dictate operational velocity.',
-    telemetryMetric: { label: 'Causal Correlation', value: '94.6%' }
+    title: 'Prioritise high-impact orders',
+    department: 'Operations & Logistics',
+    description: 'Intelligently triage order fulfillment queues based on client commitments and operational urgency.',
+    impact: 'Protects critical relationships and reduces delivery backlog friction.'
   },
   {
-    id: 'predictive-intelligence',
-    title: 'Predictive Intelligence',
-    eyebrow: '03 / ANTICIPATION',
-    tagline: 'Identify patterns, anticipate changes and surface emerging risks and opportunities.',
-    description: 'Surfaces non-obvious risks and opportunities weeks before they manifest in financial outcomes. Continuously projects operational trajectories across varying macroeconomic conditions and operational states.',
-    technicalArchitecture: [
-      'Multi-horizon stochastic trajectory projection',
-      'Non-linear leading indicator synthesis',
-      'Early-warning hazard scoring algorithms',
-      'Dynamic confidence bound calibration'
-    ],
-    operationalOutcome: 'Shifts leadership posture from reactive fire-fighting to proactive strategic navigation.',
-    telemetryMetric: { label: 'Early-Warning Horizon', value: '38 Days' }
+    title: 'Reallocate available operational resources',
+    department: 'Resource Planning',
+    description: 'Temporarily shift cross-trained team capacity and logistics buffers to bottlenecked stages.',
+    impact: 'Eases fulfillment strain without uncontrolled emergency spending.'
   },
   {
-    id: 'decision-simulation',
-    title: 'Decision Simulation',
-    eyebrow: '04 / EVALUATION',
-    tagline: 'Explore alternative scenarios and evaluate potential consequences.',
-    description: 'A pre-flight simulation engine for business strategy. Before approving a $10M CapEx program or shifting sales quotas, simulate the multi-order ramifications across inventory, working capital, and customer sentiment.',
-    technicalArchitecture: [
-      'Agent-based organizational simulation modeling',
-      'Monte Carlo parametric stress testing',
-      'Counterfactual outcome evaluation engines',
-      'Dynamic resource constraint optimization'
-    ],
-    operationalOutcome: 'Exposes unintended cross-functional side effects before capital is committed.',
-    telemetryMetric: { label: 'Simulation Latency', value: '< 2.4s' }
-  },
-  {
-    id: 'intelligent-orchestration',
-    title: 'Intelligent Orchestration',
-    eyebrow: '05 / EXECUTION',
-    tagline: 'Coordinate decisions and approved actions across business functions.',
-    description: 'Translates high-level strategic decisions into coordinated operational actions across all business systems. Coordinates cross-departmental execution while maintaining strict role-based authorization and human oversight.',
-    technicalArchitecture: [
-      'Multi-target transactional workflow orchestration',
-      'Cryptographic dual-key approval governance',
-      'Rollback-ready operational atomic transactions',
-      'Real-time SLA compliance tracking'
-    ],
-    operationalOutcome: 'Eliminates execution lag between boardroom decisions and frontline operations.',
-    telemetryMetric: { label: 'Coordination Velocity', value: 'Instant' }
-  },
-  {
-    id: 'continuous-learning',
-    title: 'Continuous Learning',
-    eyebrow: '06 / ADAPTATION',
-    tagline: 'Use actual outcomes to improve the organisation’s understanding over time.',
-    description: 'The operating system learns from every operational outcome, variance, and retrospective. As actual results differ from simulated projections, the underlying models recalibrate their weights automatically.',
-    technicalArchitecture: [
-      'Closed-loop variance attribution engine',
-      'Bayesian parameter updating over actuals',
-      'Institutional memory encoding & indexing',
-      'Organizational resilience indexing'
-    ],
-    operationalOutcome: 'The enterprise becomes progressively smarter, more resilient, and more coordinated every single day.',
-    telemetryMetric: { label: 'Model Recalibration', value: 'Real-time' }
+    title: 'Coordinate decisions across departments',
+    department: 'Cross-Functional Leadership',
+    description: 'Ensure sales, operations, and finance share the same live operational picture.',
+    impact: 'Eliminates departmental blind spots and enables the business to respond as one.'
   }
 ];
